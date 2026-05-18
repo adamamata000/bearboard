@@ -139,6 +139,29 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
     }
   }
 
+  const handleUndo = async (type) => {
+    const currentCount = type === 'beer' ? myStats.beer_count : myStats.liquor_count
+    if (currentCount <= 0) return
+
+    const updates =
+      type === 'beer'
+        ? { beer_count: Math.max(0, myStats.beer_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
+        : { liquor_count: Math.max(0, myStats.liquor_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
+
+    setMyStats((s) => ({ ...s, ...updates }))
+
+    const { error } = await supabase
+      .from('drinks')
+      .update(updates)
+      .eq('group_code', groupCode)
+      .eq('username', username)
+
+    if (error) {
+      console.error('Undo failed:', error)
+      fetchLeaderboard()
+    }
+  }
+
   const handleReset = async () => {
     if (!window.confirm(`Reset ALL counts for group "${groupCode}"?`)) return
     await supabase
@@ -221,22 +244,34 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
             <FloatUp key={id} id={id} type={type} />
           ))}
 
-          {/* Beer Button */}
-          <button
-            className="btn-beer py-8 flex flex-col items-center gap-2"
-            style={pressing === 'beer' ? { boxShadow: '0 0 48px rgba(245,158,11,0.7)' } : {}}
-            onClick={(e) => handleDrink('beer', e)}
-          >
-            <span className="text-5xl">🍺</span>
-            <span
-              className="font-display text-xl tracking-wider"
-              style={{ color: '#f59e0b' }}
+          {/* Beer Button + Undo */}
+          <div className="flex flex-col gap-2">
+            <button
+              className="btn-beer py-8 flex flex-col items-center gap-2"
+              style={pressing === 'beer' ? { boxShadow: '0 0 48px rgba(245,158,11,0.7)' } : {}}
+              onClick={(e) => handleDrink('beer', e)}
             >
-              BEER
-            </span>
-          </button>
+              <span className="text-5xl">🍺</span>
+              <span className="font-display text-xl tracking-wider" style={{ color: '#f59e0b' }}>
+                BEER
+              </span>
+            </button>
+            <button
+              onClick={() => handleUndo('beer')}
+              disabled={myStats.beer_count <= 0}
+              className="w-full py-2.5 rounded-xl font-body text-sm transition-all duration-150 active:scale-95 disabled:opacity-25"
+              style={{
+                background: 'rgba(245,158,11,0.08)',
+                border: '1px solid rgba(245,158,11,0.2)',
+                color: 'rgba(245,158,11,0.7)',
+              }}
+            >
+              − undo beer
+            </button>
+          </div>
 
-          {/* Liquor Button */}
+          {/* Liquor Button + Undo */}
+          <div className="flex flex-col gap-2">
           <button
             className="btn-liquor py-8 flex flex-col items-center gap-2"
             style={pressing === 'liquor' ? { boxShadow: '0 0 48px rgba(20,184,166,0.7)' } : {}}
@@ -250,6 +285,19 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
               LIQUOR
             </span>
           </button>
+            <button
+              onClick={() => handleUndo('liquor')}
+              disabled={myStats.liquor_count <= 0}
+              className="w-full py-2.5 rounded-xl font-body text-sm transition-all duration-150 active:scale-95 disabled:opacity-25"
+              style={{
+                background: 'rgba(20,184,166,0.08)',
+                border: '1px solid rgba(20,184,166,0.2)',
+                color: 'rgba(20,184,166,0.7)',
+              }}
+            >
+              − undo shot
+            </button>
+          </div>
         </div>
 
         {/* Leaderboard */}
