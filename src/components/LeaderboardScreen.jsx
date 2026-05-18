@@ -332,9 +332,6 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
         </div>
 
         {/* Footer */}
-        <p className="font-body text-white/20 text-xs text-center pb-2">
-          Drink responsibly. Don&apos;t pressure people to drink.
-        </p>
       </div>
 
       <style>{`
