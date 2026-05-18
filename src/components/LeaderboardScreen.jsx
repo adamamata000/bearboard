@@ -248,11 +248,17 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
           <div className="flex flex-col gap-2">
             <button
               className="btn-beer py-8 flex flex-col items-center gap-2"
-              style={pressing === 'beer' ? { boxShadow: '0 0 48px rgba(245,158,11,0.7)' } : {}}
+              style={{
+                backgroundImage: 'url(/btn-beer.jpg)',
+                backgroundSize: '100% 100%',
+                backgroundPosition: 'center 20%',
+                ...(pressing === 'beer' ? { boxShadow: '0 0 48px rgba(245,158,11,0.7)' } : {}),
+              }}
               onClick={(e) => handleDrink('beer', e)}
             >
-              <span className="text-5xl">🍺</span>
-              <span className="font-display text-xl tracking-wider" style={{ color: '#f59e0b' }}>
+              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.55))' }} />
+              <span className="relative text-5xl">🍺</span>
+              <span className="relative font-display text-xl tracking-wider" style={{ color: '#f59e0b', textShadow: '0 0 12px rgba(245,158,11,0.8)' }}>
                 BEER
               </span>
             </button>
@@ -274,14 +280,18 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
           <div className="flex flex-col gap-2">
           <button
             className="btn-liquor py-8 flex flex-col items-center gap-2"
-            style={pressing === 'liquor' ? { boxShadow: '0 0 48px rgba(20,184,166,0.7)' } : {}}
+            style={{
+              backgroundImage: 'url(/btn-liquor.jpg)',
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center 20%',
+              ...(pressing === 'liquor' ? { boxShadow: '0 0 48px rgba(20,184,166,0.7)' } : {}),
+            }}
             onClick={(e) => handleDrink('liquor', e)}
           >
-            <span className="text-5xl">🥃</span>
-            <span
-              className="font-display text-xl tracking-wider"
-              style={{ color: '#14b8a6' }}
-            >
+            <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.55))' }} />
+            <span className="relative text-5xl">🥃</span>
+            <span className="relative font-display text-xl tracking-wider" style={{ color: '#14b8a6', textShadow: '0 0 12px rgba(20,184,166,0.8)' }}>
               LIQUOR
             </span>
           </button>
@@ -379,7 +389,6 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
           )}
         </div>
 
-        {/* Footer */}
       </div>
 
       <style>{`
