@@ -52,8 +52,8 @@ function FloatUp({ id, type }) {
       key={id}
       className="absolute pointer-events-none font-display text-2xl"
       style={{
-        color: type === 'beer' ? '#f59e0b' : '#14b8a6',
-        textShadow: type === 'beer' ? '0 0 10px rgba(245,158,11,0.8)' : '0 0 10px rgba(20,184,166,0.8)',
+        color: type === 'beer' ? '#f59e0b' : type === 'wine' ? '#ec4899' : '#14b8a6',
+        textShadow: type === 'beer' ? '0 0 10px rgba(245,158,11,0.8)' : type === 'wine' ? '0 0 10px rgba(236,72,153,0.8)' : '0 0 10px rgba(20,184,166,0.8)',
         animation: 'float-up 0.8s ease-out forwards',
         top: '10%',
         left: '50%',
@@ -68,7 +68,7 @@ function FloatUp({ id, type }) {
 
 export default function LeaderboardScreen({ username, groupCode, onLeave }) {
   const [users, setUsers] = useState([])
-  const [myStats, setMyStats] = useState({ total_count: 0, beer_count: 0, liquor_count: 0 })
+  const [myStats, setMyStats] = useState({ total_count: 0, beer_count: 0, liquor_count: 0, wine_count: 0 })
   const [loading, setLoading] = useState(true)
   const [floats, setFloats] = useState([])
   const [pressing, setPressing] = useState(null)
@@ -84,7 +84,7 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
     if (!error && data) {
       setUsers(data)
       const me = data.find((u) => u.username === username)
-      if (me) setMyStats({ total_count: me.total_count, beer_count: me.beer_count, liquor_count: me.liquor_count })
+      if (me) setMyStats({ total_count: me.total_count, beer_count: me.beer_count, liquor_count: me.liquor_count, wine_count: me.wine_count || 0 })
     }
     setLoading(false)
   }, [groupCode, username])
@@ -114,7 +114,7 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
   }
 
   const handleDrink = async (type, e) => {
-    createRipple(e, type === 'beer' ? 'rgba(245,158,11,0.5)' : 'rgba(20,184,166,0.5)')
+    createRipple(e, type === 'beer' ? 'rgba(245,158,11,0.5)' : type === 'wine' ? 'rgba(190,24,93,0.5)' : 'rgba(20,184,166,0.5)')
     setPressing(type)
     setTimeout(() => setPressing(null), 150)
     addFloat(type)
@@ -123,6 +123,8 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
     const updates =
       type === 'beer'
         ? { beer_count: myStats.beer_count + 1, total_count: myStats.total_count + 1 }
+        : type === 'wine'
+        ? { wine_count: myStats.wine_count + 1, total_count: myStats.total_count + 1 }
         : { liquor_count: myStats.liquor_count + 1, total_count: myStats.total_count + 1 }
 
     setMyStats((s) => ({ ...s, ...updates }))
@@ -140,12 +142,14 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
   }
 
   const handleUndo = async (type) => {
-    const currentCount = type === 'beer' ? myStats.beer_count : myStats.liquor_count
+    const currentCount = type === 'beer' ? myStats.beer_count : type === 'wine' ? myStats.wine_count : myStats.liquor_count
     if (currentCount <= 0) return
 
     const updates =
       type === 'beer'
         ? { beer_count: Math.max(0, myStats.beer_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
+        : type === 'wine'
+        ? { wine_count: Math.max(0, myStats.wine_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
         : { liquor_count: Math.max(0, myStats.liquor_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
 
     setMyStats((s) => ({ ...s, ...updates }))
@@ -166,7 +170,7 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
     if (!window.confirm(`Reset ALL counts for group "${groupCode}"?`)) return
     await supabase
       .from('drinks')
-      .update({ total_count: 0, beer_count: 0, liquor_count: 0 })
+      .update({ total_count: 0, beer_count: 0, liquor_count: 0, wine_count: 0 })
       .eq('group_code', groupCode)
     fetchLeaderboard()
   }
@@ -222,11 +226,12 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
             </span>
             <span className="font-body text-white/20 text-xs ml-auto">you</span>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             {[
               { label: 'Total', value: myStats.total_count, emoji: '🏆', color: '#e5e7eb' },
               { label: 'Beers', value: myStats.beer_count, emoji: '🍺', color: '#f59e0b' },
               { label: 'Shots', value: myStats.liquor_count, emoji: '🥃', color: '#14b8a6' },
+              { label: 'Wines', value: myStats.wine_count, emoji: '🍷', color: '#ec4899' },
             ].map(({ label, value, emoji, color }) => (
               <div key={label} className="text-center">
                 <div className="font-display text-4xl leading-none" style={{ color }}>
@@ -239,7 +244,7 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
         </div>
 
         {/* Drink Buttons */}
-        <div className="relative grid grid-cols-2 gap-3">
+        <div className="relative grid grid-cols-3 gap-3">
           {floats.map(({ id, type }) => (
             <FloatUp key={id} id={id} type={type} />
           ))}
@@ -249,16 +254,12 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
             <button
               className="btn-beer py-8 flex flex-col items-center gap-2"
               style={{
-                backgroundImage: 'url(/btn-beer.jpg)',
-                backgroundSize: '100% 100%',
-                backgroundPosition: 'center 20%',
                 ...(pressing === 'beer' ? { boxShadow: '0 0 48px rgba(245,158,11,0.7)' } : {}),
               }}
               onClick={(e) => handleDrink('beer', e)}
             >
-              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.55))' }} />
-              <span className="relative text-5xl">🍺</span>
-              <span className="relative font-display text-xl tracking-wider" style={{ color: '#f59e0b', textShadow: '0 0 12px rgba(245,158,11,0.8)' }}>
+              <span className="text-5xl">🍺</span>
+              <span className="font-display text-xl tracking-wider" style={{ color: '#f59e0b' }}>
                 BEER
               </span>
             </button>
@@ -281,17 +282,12 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
           <button
             className="btn-liquor py-8 flex flex-col items-center gap-2"
             style={{
-              backgroundImage: 'url(/btn-liquor.jpg)',
-              backgroundSize: '100% 100%',
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'center 20%',
               ...(pressing === 'liquor' ? { boxShadow: '0 0 48px rgba(20,184,166,0.7)' } : {}),
             }}
             onClick={(e) => handleDrink('liquor', e)}
           >
-            <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.55))' }} />
-            <span className="relative text-5xl">🥃</span>
-            <span className="relative font-display text-xl tracking-wider" style={{ color: '#14b8a6', textShadow: '0 0 12px rgba(20,184,166,0.8)' }}>
+            <span className="text-5xl">🥃</span>
+            <span className="font-display text-xl tracking-wider" style={{ color: '#14b8a6' }}>
               LIQUOR
             </span>
           </button>
@@ -306,6 +302,36 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
               }}
             >
               − undo shot
+            </button>
+          </div>
+
+          {/* Wine Button + Undo */}
+          <div className="flex flex-col gap-2">
+            <button
+              className="btn-beer py-8 flex flex-col items-center gap-2"
+              style={{
+                background: 'linear-gradient(135deg, rgba(190,24,93,0.15) 0%, rgba(190,24,93,0.08) 100%)',
+                border: '2px solid rgba(190,24,93,0.4)',
+                boxShadow: pressing === 'wine' ? '0 0 48px rgba(190,24,93,0.7)' : '0 0 24px rgba(190,24,93,0.3)',
+              }}
+              onClick={(e) => handleDrink('wine', e)}
+            >
+              <span className="text-5xl">🍷</span>
+              <span className="font-display text-xl tracking-wider" style={{ color: '#ec4899', textShadow: '0 0 12px rgba(236,72,153,0.8)' }}>
+                WINE
+              </span>
+            </button>
+            <button
+              onClick={() => handleUndo('wine')}
+              disabled={myStats.wine_count <= 0}
+              className="w-full py-2.5 rounded-xl font-body text-sm transition-all duration-150 active:scale-95 disabled:opacity-25"
+              style={{
+                background: 'rgba(190,24,93,0.08)',
+                border: '1px solid rgba(190,24,93,0.2)',
+                color: 'rgba(236,72,153,0.7)',
+              }}
+            >
+              − undo wine
             </button>
           </div>
         </div>
@@ -364,12 +390,9 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
                         )}
                       </div>
                       <div className="flex gap-3 mt-0.5">
-                        <span className="font-body text-xs text-white/30">
-                          🍺 {user.beer_count}
-                        </span>
-                        <span className="font-body text-xs text-white/30">
-                          🥃 {user.liquor_count}
-                        </span>
+                        <span className="font-body text-xs text-white/30">🍺 {user.beer_count}</span>
+                        <span className="font-body text-xs text-white/30">🥃 {user.liquor_count}</span>
+                        <span className="font-body text-xs text-white/30">🍷 {user.wine_count || 0}</span>
                       </div>
                     </div>
 
@@ -388,7 +411,6 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
             </ul>
           )}
         </div>
-
       </div>
 
       <style>{`
