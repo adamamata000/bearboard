@@ -205,7 +205,7 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
           </div>
           <div className="grid grid-cols-5 gap-2">
             {[
-              { label: 'Total', value: myStats.total_count, emoji: '🏆', color: '#e5e7eb' },
+              { label: 'Total', value: myStats.total_count, emoji: '🏆', color: myStats.total_count < 0 ? '#f87171' : '#e5e7eb' },
               { label: 'Beers', value: myStats.beer_count, emoji: '🍺', color: '#f59e0b' },
               { label: 'Shots', value: myStats.liquor_count, emoji: '🥃', color: '#14b8a6' },
               { label: 'Wines', value: myStats.wine_count, emoji: '🍷', color: '#ec4899' },
@@ -362,7 +362,7 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="font-display text-2xl" style={{ color: isMe ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}>
+                      <div className="font-display text-2xl" style={{ color: user.total_count < 0 ? '#f87171' : isMe ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}>
                         {user.total_count}
                       </div>
                       <div className="font-body text-white/25 text-[10px]">drinks</div>
@@ -373,7 +373,6 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
             </ul>
           )}
         </div>
-
       </div>
 
       <style>{`
