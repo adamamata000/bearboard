@@ -27,7 +27,7 @@ function createRipple(e, color) {
   circle.addEventListener('animationend', () => circle.remove())
 }
 
-// Rank badge colors
+// Rank badge
 function RankBadge({ rank }) {
   const styles = {
     1: { bg: 'rgba(245,158,11,0.3)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.6)', shadow: '0 0 12px rgba(245,158,11,0.5)' },
@@ -36,39 +36,39 @@ function RankBadge({ rank }) {
   }
   const s = styles[rank] || { bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)', shadow: 'none' }
   return (
-    <div
-      className="rank-badge flex-shrink-0"
-      style={{ background: s.bg, color: s.color, border: s.border, boxShadow: s.shadow }}
-    >
-      {rank <= 3 ? ['🥇','🥈','🥉'][rank - 1] : rank}
+    <div className="rank-badge flex-shrink-0" style={{ background: s.bg, color: s.color, border: s.border, boxShadow: s.shadow }}>
+      {rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank}
     </div>
   )
 }
 
-// Floating +1 animation
+// Floating animation — +1 for drinks, -5 for puke
 function FloatUp({ id, type }) {
+  const isPuke = type === 'puke'
+  const color = isPuke ? '#4ade80' : type === 'beer' ? '#f59e0b' : type === 'wine' ? '#ec4899' : '#14b8a6'
+  const shadow = isPuke ? '0 0 10px rgba(74,222,128,0.8)' : type === 'beer' ? '0 0 10px rgba(245,158,11,0.8)' : type === 'wine' ? '0 0 10px rgba(236,72,153,0.8)' : '0 0 10px rgba(20,184,166,0.8)'
   return (
     <div
       key={id}
       className="absolute pointer-events-none font-display text-2xl"
       style={{
-        color: type === 'beer' ? '#f59e0b' : type === 'wine' ? '#ec4899' : '#14b8a6',
-        textShadow: type === 'beer' ? '0 0 10px rgba(245,158,11,0.8)' : type === 'wine' ? '0 0 10px rgba(236,72,153,0.8)' : '0 0 10px rgba(20,184,166,0.8)',
-        animation: 'float-up 0.8s ease-out forwards',
-        top: '10%',
+        color,
+        textShadow: shadow,
+        animation: isPuke ? 'float-down 0.9s ease-out forwards' : 'float-up 0.8s ease-out forwards',
+        top: isPuke ? '30%' : '10%',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 50,
       }}
     >
-      +1
+      {isPuke ? '🤮 −5' : '+1'}
     </div>
   )
 }
 
 export default function LeaderboardScreen({ username, groupCode, onLeave }) {
   const [users, setUsers] = useState([])
-  const [myStats, setMyStats] = useState({ total_count: 0, beer_count: 0, liquor_count: 0, wine_count: 0 })
+  const [myStats, setMyStats] = useState({ total_count: 0, beer_count: 0, liquor_count: 0, wine_count: 0, puke_count: 0 })
   const [loading, setLoading] = useState(true)
   const [floats, setFloats] = useState([])
   const [pressing, setPressing] = useState(null)
@@ -84,33 +84,30 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
     if (!error && data) {
       setUsers(data)
       const me = data.find((u) => u.username === username)
-      if (me) setMyStats({ total_count: me.total_count, beer_count: me.beer_count, liquor_count: me.liquor_count, wine_count: me.wine_count || 0 })
+      if (me) setMyStats({
+        total_count: me.total_count,
+        beer_count: me.beer_count,
+        liquor_count: me.liquor_count,
+        wine_count: me.wine_count || 0,
+        puke_count: me.puke_count || 0,
+      })
     }
     setLoading(false)
   }, [groupCode, username])
 
-  // Realtime subscription
   useEffect(() => {
     fetchLeaderboard()
-
     channelRef.current = supabase
       .channel(`group:${groupCode}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'drinks', filter: `group_code=eq.${groupCode}` },
-        () => { fetchLeaderboard() }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drinks', filter: `group_code=eq.${groupCode}` }, () => { fetchLeaderboard() })
       .subscribe()
-
-    return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current)
-    }
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
   }, [fetchLeaderboard, groupCode])
 
   const addFloat = (type) => {
     const id = Date.now()
     setFloats((f) => [...f, { id, type }])
-    setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 900)
+    setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 1000)
   }
 
   const handleDrink = async (type, e) => {
@@ -119,59 +116,46 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
     setTimeout(() => setPressing(null), 150)
     addFloat(type)
 
-    // Optimistic update
     const updates =
-      type === 'beer'
-        ? { beer_count: myStats.beer_count + 1, total_count: myStats.total_count + 1 }
-        : type === 'wine'
-        ? { wine_count: myStats.wine_count + 1, total_count: myStats.total_count + 1 }
-        : { liquor_count: myStats.liquor_count + 1, total_count: myStats.total_count + 1 }
+      type === 'beer' ? { beer_count: myStats.beer_count + 1, total_count: myStats.total_count + 1 }
+      : type === 'wine' ? { wine_count: myStats.wine_count + 1, total_count: myStats.total_count + 1 }
+      : { liquor_count: myStats.liquor_count + 1, total_count: myStats.total_count + 1 }
 
     setMyStats((s) => ({ ...s, ...updates }))
-
-    const { error } = await supabase
-      .from('drinks')
-      .update(updates)
-      .eq('group_code', groupCode)
-      .eq('username', username)
-
-    if (error) {
-      console.error('Update failed:', error)
-      fetchLeaderboard() // Revert on error
-    }
+    const { error } = await supabase.from('drinks').update(updates).eq('group_code', groupCode).eq('username', username)
+    if (error) { console.error('Update failed:', error); fetchLeaderboard() }
   }
 
   const handleUndo = async (type) => {
     const currentCount = type === 'beer' ? myStats.beer_count : type === 'wine' ? myStats.wine_count : myStats.liquor_count
     if (currentCount <= 0) return
-
     const updates =
-      type === 'beer'
-        ? { beer_count: Math.max(0, myStats.beer_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
-        : type === 'wine'
-        ? { wine_count: Math.max(0, myStats.wine_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
-        : { liquor_count: Math.max(0, myStats.liquor_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
-
+      type === 'beer' ? { beer_count: Math.max(0, myStats.beer_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
+      : type === 'wine' ? { wine_count: Math.max(0, myStats.wine_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
+      : { liquor_count: Math.max(0, myStats.liquor_count - 1), total_count: Math.max(0, myStats.total_count - 1) }
     setMyStats((s) => ({ ...s, ...updates }))
+    const { error } = await supabase.from('drinks').update(updates).eq('group_code', groupCode).eq('username', username)
+    if (error) { console.error('Undo failed:', error); fetchLeaderboard() }
+  }
 
+  const handlePuke = async (e) => {
+    const newTotal = Math.max(0, myStats.total_count - 5)
+    if (myStats.total_count === newTotal) return
+    createRipple(e, 'rgba(74,222,128,0.4)')
+    addFloat('puke')
+    const newPukeCount = myStats.puke_count + 1
+    setMyStats((s) => ({ ...s, total_count: newTotal, puke_count: newPukeCount }))
     const { error } = await supabase
       .from('drinks')
-      .update(updates)
+      .update({ total_count: newTotal, puke_count: newPukeCount })
       .eq('group_code', groupCode)
       .eq('username', username)
-
-    if (error) {
-      console.error('Undo failed:', error)
-      fetchLeaderboard()
-    }
+    if (error) { console.error('Puke failed:', error); fetchLeaderboard() }
   }
 
   const handleReset = async () => {
     if (!window.confirm(`Reset ALL counts for group "${groupCode}"?`)) return
-    await supabase
-      .from('drinks')
-      .update({ total_count: 0, beer_count: 0, liquor_count: 0, wine_count: 0 })
-      .eq('group_code', groupCode)
+    await supabase.from('drinks').update({ total_count: 0, beer_count: 0, liquor_count: 0, wine_count: 0, puke_count: 0 }).eq('group_code', groupCode)
     fetchLeaderboard()
   }
 
@@ -182,29 +166,18 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
       {/* Header */}
       <header className="flex items-center justify-between px-5 pt-4 pb-3">
         <div>
-          <h1
-            className="font-display text-3xl tracking-wider leading-none"
-            style={{ color: '#f59e0b', textShadow: '0 0 12px rgba(245,158,11,0.6)' }}
-          >
+          <h1 className="font-display text-3xl tracking-wider leading-none" style={{ color: '#f59e0b', textShadow: '0 0 12px rgba(245,158,11,0.6)' }}>
             BEERBOARD
           </h1>
-          <p className="font-body text-white/30 text-xs mt-0.5 tracking-widest uppercase">
-            #{groupCode}
-          </p>
+          <p className="font-body text-white/30 text-xs mt-0.5 tracking-widest uppercase">#{groupCode}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
-            <button
-              onClick={handleReset}
-              className="font-body text-xs px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 active:scale-95 transition-all"
-            >
+            <button onClick={handleReset} className="font-body text-xs px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 active:scale-95 transition-all">
               🔄 Reset
             </button>
           )}
-          <button
-            onClick={onLeave}
-            className="font-body text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 active:scale-95 transition-all"
-          >
+          <button onClick={onLeave} className="font-body text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 active:scale-95 transition-all">
             Leave
           </button>
         </div>
@@ -212,32 +185,24 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
 
       <div className="flex-1 overflow-y-auto px-4 space-y-4 pb-4">
         {/* My Stats Card */}
-        <div
-          className="glass-card p-5 animate-slide-up neon-border-amber"
-          style={{ animationFillMode: 'both' }}
-        >
+        <div className="glass-card p-5 animate-slide-up neon-border-amber" style={{ animationFillMode: 'both' }}>
           <div className="flex items-center gap-2 mb-4">
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ background: '#f59e0b', boxShadow: '0 0 8px rgba(245,158,11,0.8)' }}
-            />
-            <span className="font-body text-white/50 text-xs uppercase tracking-widest">
-              {username}
-            </span>
+            <div className="w-2 h-2 rounded-full" style={{ background: '#f59e0b', boxShadow: '0 0 8px rgba(245,158,11,0.8)' }} />
+            <span className="font-body text-white/50 text-xs uppercase tracking-widest">{username}</span>
             <span className="font-body text-white/20 text-xs ml-auto">you</span>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {[
               { label: 'Total', value: myStats.total_count, emoji: '🏆', color: '#e5e7eb' },
               { label: 'Beers', value: myStats.beer_count, emoji: '🍺', color: '#f59e0b' },
               { label: 'Shots', value: myStats.liquor_count, emoji: '🥃', color: '#14b8a6' },
               { label: 'Wines', value: myStats.wine_count, emoji: '🍷', color: '#ec4899' },
+              { label: 'Pukes', value: myStats.puke_count, emoji: '🤮', color: '#4ade80' },
             ].map(({ label, value, emoji, color }) => (
               <div key={label} className="text-center">
-                <div className="font-display text-4xl leading-none" style={{ color }}>
-                  {value}
-                </div>
-                <div className="font-body text-white/40 text-xs mt-1">{emoji} {label}</div>
+                <div className="font-display text-3xl leading-none" style={{ color }}>{value}</div>
+                <div className="font-body text-white/40 text-[10px] mt-1">{emoji}</div>
+                <div className="font-body text-white/30 text-[10px]">{label}</div>
               </div>
             ))}
           </div>
@@ -249,63 +214,47 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
             <FloatUp key={id} id={id} type={type} />
           ))}
 
-          {/* Beer Button + Undo */}
+          {/* Beer */}
           <div className="flex flex-col gap-2">
             <button
               className="btn-beer py-8 flex flex-col items-center gap-2"
-              style={{
-                ...(pressing === 'beer' ? { boxShadow: '0 0 48px rgba(245,158,11,0.7)' } : {}),
-              }}
+              style={{ ...(pressing === 'beer' ? { boxShadow: '0 0 48px rgba(245,158,11,0.7)' } : {}) }}
               onClick={(e) => handleDrink('beer', e)}
             >
               <span className="text-5xl">🍺</span>
-              <span className="font-display text-xl tracking-wider" style={{ color: '#f59e0b' }}>
-                BEER
-              </span>
+              <span className="font-display text-xl tracking-wider" style={{ color: '#f59e0b' }}>BEER</span>
             </button>
             <button
               onClick={() => handleUndo('beer')}
               disabled={myStats.beer_count <= 0}
               className="w-full py-2.5 rounded-xl font-body text-sm transition-all duration-150 active:scale-95 disabled:opacity-25"
-              style={{
-                background: 'rgba(245,158,11,0.08)',
-                border: '1px solid rgba(245,158,11,0.2)',
-                color: 'rgba(245,158,11,0.7)',
-              }}
+              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: 'rgba(245,158,11,0.7)' }}
             >
               − undo beer
             </button>
           </div>
 
-          {/* Liquor Button + Undo */}
+          {/* Liquor */}
           <div className="flex flex-col gap-2">
-          <button
-            className="btn-liquor py-8 flex flex-col items-center gap-2"
-            style={{
-              ...(pressing === 'liquor' ? { boxShadow: '0 0 48px rgba(20,184,166,0.7)' } : {}),
-            }}
-            onClick={(e) => handleDrink('liquor', e)}
-          >
-            <span className="text-5xl">🥃</span>
-            <span className="font-display text-xl tracking-wider" style={{ color: '#14b8a6' }}>
-              LIQUOR
-            </span>
-          </button>
+            <button
+              className="btn-liquor py-8 flex flex-col items-center gap-2"
+              style={{ ...(pressing === 'liquor' ? { boxShadow: '0 0 48px rgba(20,184,166,0.7)' } : {}) }}
+              onClick={(e) => handleDrink('liquor', e)}
+            >
+              <span className="text-5xl">🥃</span>
+              <span className="font-display text-xl tracking-wider" style={{ color: '#14b8a6' }}>LIQUOR</span>
+            </button>
             <button
               onClick={() => handleUndo('liquor')}
               disabled={myStats.liquor_count <= 0}
               className="w-full py-2.5 rounded-xl font-body text-sm transition-all duration-150 active:scale-95 disabled:opacity-25"
-              style={{
-                background: 'rgba(20,184,166,0.08)',
-                border: '1px solid rgba(20,184,166,0.2)',
-                color: 'rgba(20,184,166,0.7)',
-              }}
+              style={{ background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.2)', color: 'rgba(20,184,166,0.7)' }}
             >
               − undo shot
             </button>
           </div>
 
-          {/* Wine Button + Undo */}
+          {/* Wine */}
           <div className="flex flex-col gap-2">
             <button
               className="btn-beer py-8 flex flex-col items-center gap-2"
@@ -317,40 +266,44 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
               onClick={(e) => handleDrink('wine', e)}
             >
               <span className="text-5xl">🍷</span>
-              <span className="font-display text-xl tracking-wider" style={{ color: '#ec4899', textShadow: '0 0 12px rgba(236,72,153,0.8)' }}>
-                WINE
-              </span>
+              <span className="font-display text-xl tracking-wider" style={{ color: '#ec4899', textShadow: '0 0 12px rgba(236,72,153,0.8)' }}>WINE</span>
             </button>
             <button
               onClick={() => handleUndo('wine')}
               disabled={myStats.wine_count <= 0}
               className="w-full py-2.5 rounded-xl font-body text-sm transition-all duration-150 active:scale-95 disabled:opacity-25"
-              style={{
-                background: 'rgba(190,24,93,0.08)',
-                border: '1px solid rgba(190,24,93,0.2)',
-                color: 'rgba(236,72,153,0.7)',
-              }}
+              style={{ background: 'rgba(190,24,93,0.08)', border: '1px solid rgba(190,24,93,0.2)', color: 'rgba(236,72,153,0.7)' }}
             >
               − undo wine
             </button>
           </div>
         </div>
 
+        {/* Puke Button */}
+        <button
+          onClick={handlePuke}
+          disabled={myStats.total_count <= 0}
+          className="w-full py-4 rounded-2xl font-display text-2xl tracking-wider transition-all duration-150 active:scale-95 disabled:opacity-25"
+          style={{
+            background: 'rgba(74,222,128,0.06)',
+            border: '2px solid rgba(74,222,128,0.25)',
+            color: 'rgba(74,222,128,0.7)',
+            boxShadow: '0 0 16px rgba(74,222,128,0.1)',
+          }}
+        >
+          🤮 PUKE (−5)
+        </button>
+
         {/* Leaderboard */}
         <div className="glass-card overflow-hidden animate-fade-in">
           <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
             <h2 className="font-display text-xl tracking-wider text-white/80">LEADERBOARD</h2>
-            <span className="font-body text-white/30 text-xs">
-              {users.length} {users.length === 1 ? 'player' : 'players'}
-            </span>
+            <span className="font-body text-white/30 text-xs">{users.length} {users.length === 1 ? 'player' : 'players'}</span>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-10">
-              <div
-                className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: 'rgba(245,158,11,0.4)', borderTopColor: 'transparent' }}
-              />
+              <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'rgba(245,158,11,0.4)', borderTopColor: 'transparent' }} />
             </div>
           ) : users.length === 0 ? (
             <div className="text-center py-10">
@@ -364,43 +317,31 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
                   <li
                     key={user.id}
                     className="flex items-center gap-3 px-5 py-3.5 border-b border-white/[0.04] last:border-0 transition-all duration-300"
-                    style={
-                      isMe
-                        ? { background: 'linear-gradient(90deg, rgba(245,158,11,0.06), transparent)' }
-                        : {}
-                    }
+                    style={isMe ? { background: 'linear-gradient(90deg, rgba(245,158,11,0.06), transparent)' } : {}}
                   >
                     <RankBadge rank={idx + 1} />
-
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span
-                          className="font-body font-semibold text-sm truncate"
-                          style={{ color: isMe ? '#f59e0b' : 'rgba(255,255,255,0.85)' }}
-                        >
+                        <span className="font-body font-semibold text-sm truncate" style={{ color: isMe ? '#f59e0b' : 'rgba(255,255,255,0.85)' }}>
                           {user.username}
                         </span>
                         {isMe && (
-                          <span
-                            className="font-body text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded"
-                            style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}
-                          >
+                          <span className="font-body text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
                             you
                           </span>
                         )}
                       </div>
-                      <div className="flex gap-3 mt-0.5">
+                      <div className="flex gap-2 mt-0.5 flex-wrap">
                         <span className="font-body text-xs text-white/30">🍺 {user.beer_count}</span>
                         <span className="font-body text-xs text-white/30">🥃 {user.liquor_count}</span>
                         <span className="font-body text-xs text-white/30">🍷 {user.wine_count || 0}</span>
+                        {(user.puke_count || 0) > 0 && (
+                          <span className="font-body text-xs" style={{ color: 'rgba(74,222,128,0.6)' }}>🤮 {user.puke_count}</span>
+                        )}
                       </div>
                     </div>
-
                     <div className="text-right flex-shrink-0">
-                      <div
-                        className="font-display text-2xl"
-                        style={{ color: isMe ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}
-                      >
+                      <div className="font-display text-2xl" style={{ color: isMe ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}>
                         {user.total_count}
                       </div>
                       <div className="font-body text-white/25 text-[10px]">drinks</div>
@@ -411,12 +352,17 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
             </ul>
           )}
         </div>
+
       </div>
 
       <style>{`
         @keyframes float-up {
           0% { opacity: 1; transform: translateX(-50%) translateY(0); }
           100% { opacity: 0; transform: translateX(-50%) translateY(-60px); }
+        }
+        @keyframes float-down {
+          0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(40px); }
         }
       `}</style>
     </div>
