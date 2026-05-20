@@ -139,8 +139,7 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
   }
 
   const handlePuke = async (e) => {
-    const newTotal = Math.max(0, myStats.total_count - 5)
-    if (myStats.total_count === newTotal) return
+    const newTotal = myStats.total_count - 5
     createRipple(e, 'rgba(74,222,128,0.4)')
     addFloat('puke')
     const newPukeCount = myStats.puke_count + 1
@@ -151,6 +150,19 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
       .eq('group_code', groupCode)
       .eq('username', username)
     if (error) { console.error('Puke failed:', error); fetchLeaderboard() }
+  }
+
+  const handleUndoPuke = async () => {
+    if (myStats.puke_count <= 0) return
+    const newTotal = myStats.total_count + 5
+    const newPukeCount = myStats.puke_count - 1
+    setMyStats((s) => ({ ...s, total_count: newTotal, puke_count: newPukeCount }))
+    const { error } = await supabase
+      .from('drinks')
+      .update({ total_count: newTotal, puke_count: newPukeCount })
+      .eq('group_code', groupCode)
+      .eq('username', username)
+    if (error) { console.error('Undo puke failed:', error); fetchLeaderboard() }
   }
 
   const handleReset = async () => {
@@ -280,19 +292,28 @@ export default function LeaderboardScreen({ username, groupCode, onLeave }) {
         </div>
 
         {/* Puke Button */}
-        <button
-          onClick={handlePuke}
-          disabled={myStats.total_count <= 0}
-          className="w-full py-4 rounded-2xl font-display text-2xl tracking-wider transition-all duration-150 active:scale-95 disabled:opacity-25"
-          style={{
-            background: 'rgba(74,222,128,0.06)',
-            border: '2px solid rgba(74,222,128,0.25)',
-            color: 'rgba(74,222,128,0.7)',
-            boxShadow: '0 0 16px rgba(74,222,128,0.1)',
-          }}
-        >
-          🤮 PUKE (−5)
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handlePuke}
+            className="w-full py-4 rounded-2xl font-display text-2xl tracking-wider transition-all duration-150 active:scale-95"
+            style={{
+              background: 'rgba(74,222,128,0.06)',
+              border: '2px solid rgba(74,222,128,0.25)',
+              color: 'rgba(74,222,128,0.7)',
+              boxShadow: '0 0 16px rgba(74,222,128,0.1)',
+            }}
+          >
+            🤮 PUKE (−5)
+          </button>
+          <button
+            onClick={handleUndoPuke}
+            disabled={myStats.puke_count <= 0}
+            className="w-full py-2.5 rounded-xl font-body text-sm transition-all duration-150 active:scale-95 disabled:opacity-25"
+            style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.2)', color: 'rgba(74,222,128,0.6)' }}
+          >
+            − undo puke
+          </button>
+        </div>
 
         {/* Leaderboard */}
         <div className="glass-card overflow-hidden animate-fade-in">
